@@ -84,6 +84,11 @@
                         <x-content-blocks :blocks="$blocks" />
                     @endforeach
                 </div>
+                @if ($post->external_data['preview'] ?? false)
+                    <div class="post-source">Local preview article · Original starter copy for this design preview.
+                        <a href="{{ $post->external_data['source'] }}" target="_blank" rel="noopener noreferrer">Read the official Rockstar source ↗</a>
+                    </div>
+                @endif
 
                 {{-- Tags --}}
                 @if ($post->tags->isNotEmpty())

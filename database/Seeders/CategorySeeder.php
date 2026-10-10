@@ -27,7 +27,7 @@ class CategorySeeder extends Seeder
         ];
 
         foreach ($schemas as $schema) {
-            Category::create($schema);
+            Category::updateOrCreate(['slug' => $schema['slug']], $schema);
         }
     }
 }

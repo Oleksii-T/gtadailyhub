@@ -1,29 +1,6 @@
 @extends('layouts.app')
-
-@php
-    $bcs = [
-        ['Home', route('index')],
-        [$page->title]
-    ];
-@endphp
-
+@section('title', $page->meta_title ?: $page->title)
+@section('description', $page->meta_description)
 @section('content')
-    <main class="main">
-        <div class="main__wrapper">
-            <div class="content">
-                <section class="section section-head">
-                    <h1>{{$page->title}}</h1>
-                    {!!$page->content!!}
-                </section>
-            </div>
-            <div class="sidebar">
-                <x-side-search-block />
-                <x-side-links-block />
-            </div>
-        </div>
-
-        <x-go-to-top />
-    </main>
-
-    <x-page-bg />
+<div class="page legal-page"><div class="post-breadcrumb"><a href="{{ route('index') }}">Home</a></div><h1 class="legal-page__title">{{ $page->title }}</h1><div class="legal-page__body">{!! $page->content !!}</div></div>
 @endsection

@@ -52,6 +52,11 @@ class PageSeeder extends Seeder
                 'link' => 'cookie-policy',
             ],
             [
+                'status' => PageStatus::STATIC,
+                'title' => 'Review Policy',
+                'link' => 'review-policy',
+            ],
+            [
                 'status' => PageStatus::ENTITY,
                 'title' => 'Post',
                 'link' => '{post}',

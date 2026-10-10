@@ -18,6 +18,7 @@ class CategoryController extends Controller
         $perPage = 10;
         $page = abs((int) filter_var($page, FILTER_SANITIZE_NUMBER_INT));
         $posts = $category->posts()
+            ->with(['category', 'tags'])
             ->publised()
             ->latest('published_at')
             ->when($request->search, fn ($q, $v) => $q->where('title', 'like', "%$v%"))
@@ -42,7 +43,7 @@ class CategoryController extends Controller
             'html' => view('components.post-cards-with-pages', [
                 'posts' => $posts,
                 'model' => $category,
-                'includeQueryParams' => ['game'],
+                'includeQueryParams' => ['game', 'search'],
             ])->render(),
         ]);
     }

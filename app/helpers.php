@@ -42,7 +42,7 @@ if (! function_exists('intToAlphabet')) {
 if (! function_exists('isdev')) {
     function isdev()
     {
-        if (\Illuminate\Support\Facades\Facade::getFacadeApplication() !== null) {
+        if (\Illuminate\Support\Facades\Facade::getFacadeApplication() !== null && app()->bound('auth')) {
             // late checks will not set APP_DEBUG
 
             $user = auth()->user();

@@ -42,7 +42,7 @@ class AuthorSeeder extends Seeder
         ];
 
         foreach ($schemas as $schema) {
-            Author::create($schema);
+            Author::updateOrCreate(['slug' => $schema['slug']], $schema + ['description' => '', 'description_small' => '']);
         }
     }
 }

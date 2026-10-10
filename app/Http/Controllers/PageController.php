@@ -2,10 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Actions\GetTopTagsAction;
 use App\Enums\FeedbackStatus;
 use App\Enums\PageStatus;
-use App\Models\Author;
 use App\Models\Category;
 use App\Models\Feedback;
 use App\Models\FeedbackBan;
@@ -18,32 +16,14 @@ class PageController extends Controller
     public function index()
     {
         $page = Page::get('/');
-        $authors = Author::get();
         $newsCategory = Category::where('slug', 'news')->firstOrFail();
-
         $digests = Post::publised()->latest('published_at')->whereRelation('category', 'slug', 'digests')->get();
+        $latestPosts = Post::publised()->latest('published_at')
+            ->whereRelation('category', 'slug', 'news')
+            ->with(['category', 'tags'])->limit(7)->get();
+        $featuredPost = $latestPosts->first();
 
-        // Pick top 2 tags by post count (news category only)
-        $topNewsTags = GetTopTagsAction::run();
-
-        $col1Tag = $topNewsTags->get(0);
-        $col2Tag = $topNewsTags->get(1);
-
-        $newsQ = Post::publised()->latest('published_at')->whereRelation('category', 'slug', 'news');
-
-        $col1Posts = $col1Tag
-            ? (clone $newsQ)->whereRelation('tags', 'slug', $col1Tag->slug)->limit(3)->get()
-            : collect();
-
-        $col2Posts = $col2Tag
-            ? (clone $newsQ)->whereRelation('tags', 'slug', $col2Tag->slug)->whereNotIn('id', $col1Posts->pluck('id'))->limit(3)->get()
-            : collect();
-
-        // Column 3: latest news not already shown in col1 or col2
-        $shownIds = $col1Posts->merge($col2Posts)->pluck('id');
-        $col3Posts = (clone $newsQ)->whereNotIn('id', $shownIds)->limit(3)->get();
-
-        return view('index', compact('page', 'authors', 'newsCategory', 'col1Tag', 'col2Tag', 'col1Posts', 'col2Posts', 'col3Posts', 'digests'));
+        return view('index', compact('page', 'newsCategory', 'featuredPost', 'latestPosts', 'digests'));
     }
 
     public function show(Request $request)

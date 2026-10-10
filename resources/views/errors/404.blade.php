@@ -1,15 +1,6 @@
 @extends('layouts.app')
-
-@section('title', 'Not found')
-@section('description', 'Not found')
-
+@section('title', 'Off the map. — GTA VI News')
+@section('meta-robots', 'noindex, follow')
 @section('content')
-    <main>
-        <section class="section section-head">
-            <h1>404 PAGE NOT FOUND</h1>
-            Oops! Seem like we can not find the resource you are looking for...
-            <br>
-            <a href="{{route("index")}}" class="button">Go Back Home</a>
-        </section>
-    </main>
+<div class="page error-page"><span class="eyebrow">404 / GTA VI News</span><h1 class="cat-title">Off the map.</h1><p>The page you’re looking for has moved or doesn’t exist.</p><a class="text-link" href="{{ route('index') }}">Back to Vice City ↗</a></div>
 @endsection

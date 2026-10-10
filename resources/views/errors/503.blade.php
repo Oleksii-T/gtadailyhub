@@ -1,12 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>LocalHost</title>
-</head>
-<body>
-    Maintenance mode...
-</body>
-</html>
+@extends('layouts.app')
+@section('title', 'Back on the road soon. — GTA VI News')
+@section('meta-robots', 'noindex, follow')
+@section('content')
+<div class="page error-page"><span class="eyebrow">503 / GTA VI News</span><h1 class="cat-title">Back on the road soon.</h1><p>We’re taking a short break for maintenance. Please check back soon.</p><a class="text-link" href="{{ route('index') }}">Back to Vice City ↗</a></div>
+@endsection

@@ -17,19 +17,19 @@
                 @csrf
                 <div class="contact-form__field">
                     <label class="contact-form__label" for="contact-name">Name</label>
-                    <input class="contact-form__input" type="text" id="contact-name" name="name" placeholder="Your name" required>
+                    <input class="contact-form__input" type="text" id="contact-name" name="name" placeholder="Your name" autocomplete="name" maxlength="255" required>
                 </div>
                 <div class="contact-form__field">
                     <label class="contact-form__label" for="contact-email">Email</label>
-                    <input class="contact-form__input" type="email" id="contact-email" name="email" placeholder="name@example.com" required>
+                    <input class="contact-form__input" type="email" id="contact-email" name="email" placeholder="name@example.com" autocomplete="email" maxlength="255" required>
                 </div>
                 <div class="contact-form__field">
                     <label class="contact-form__label" for="contact-subject">Subject</label>
-                    <input class="contact-form__input" type="text" id="contact-subject" name="subject" placeholder="What is this about?" required>
+                    <input class="contact-form__input" type="text" id="contact-subject" name="subject" placeholder="What is this about?" maxlength="255" required>
                 </div>
                 <div class="contact-form__field">
                     <label class="contact-form__label" for="contact-text">Message</label>
-                    <textarea class="contact-form__textarea" id="contact-text" name="text" rows="6" placeholder="Share the details." required></textarea>
+                    <textarea class="contact-form__textarea" id="contact-text" name="text" rows="6" placeholder="Share the details." maxlength="2000" required></textarea>
                 </div>
                 <button class="contact-form__btn" type="submit">{{ $page->show('form:cta') }}</button>
             </form>
@@ -37,7 +37,11 @@
 
         <div class="contact-side-blocks">
             <div class="contact-block">
-                {!! $page->show('side:content') !!}
+                @if($page->show('side:content') && $page->show('side:content') !== 'todo')
+                    {!! $page->show('side:content') !!}
+                @else
+                    <span class="eyebrow">The news desk</span><h2>Got a story?</h2><p>Send a tip, ask a question, or share something worth a closer look. We'd love to hear from fellow visitors to Vice City.</p>
+                @endif
             </div>
         </div>
     </div>
@@ -49,62 +53,37 @@
 @endsection
 
 @section('scripts')
+@if(config('services.recaptcha.public_key'))
 <script src="https://www.google.com/recaptcha/api.js?render={{ config('services.recaptcha.public_key') }}"></script>
+@endif
 <script>
-$(document).ready(function () {
-    $('#contact-form').on('submit', function (e) {
-        e.preventDefault();
-
-        var $form = $(this);
-        var $btn  = $form.find('.contact-form__btn');
-        $btn.prop('disabled', true).text('Sending…');
-
-        grecaptcha.ready(function () {
-            grecaptcha.execute('{{ config('services.recaptcha.public_key') }}', { action: 'contact' }).then(function (token) {
-                $.ajax({
-                    url:    '{{ route('contact-us') }}',
-                    method: 'POST',
-                    data: {
-                        _token:    '{{ csrf_token() }}',
-                        name:      $('#contact-name').val(),
-                        email:     $('#contact-email').val(),
-                        subject:   $('#contact-subject').val(),
-                        text:      $('#contact-text').val(),
-                        recaptcha: token,
-                    },
-                    success: function () {
-                        Swal.fire({
-                            icon:               'success',
-                            title:              'Message sent!',
-                            text:               'We\'ll get back to you within 2–3 business days.',
-                            background:         '#0f0f10',
-                            color:              '#ededed',
-                            confirmButtonColor: '#ededed',
-                            confirmButtonText:  'OK',
-                        });
-                        $form[0].reset();
-                    },
-                    error: function (xhr) {
-                        var msg = 'Something went wrong. Please try again.';
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            msg = xhr.responseJSON.message;
-                        }
-                        Swal.fire({
-                            icon:               'error',
-                            title:              'Error',
-                            text:               msg,
-                            background:         '#0f0f10',
-                            color:              '#ededed',
-                            confirmButtonColor: '#ededed',
-                        });
-                    },
-                    complete: function () {
-                        $btn.prop('disabled', false).text('Send Message');
-                    },
-                });
-            });
+document.querySelector('#contact-form').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    const button = this.querySelector('button');
+    const label = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Sending…';
+    try {
+        const data = new FormData(this);
+        const key = @json(config('services.recaptcha.public_key'));
+        if (key) {
+            if (!window.grecaptcha) throw new Error('Verification could not load. Please try again.');
+            await new Promise(resolve => grecaptcha.ready(resolve));
+            data.append('g-recaptcha-response', await grecaptcha.execute(key, {action: 'contact'}));
+        }
+        const response = await fetch(@json(route('feedbacks.store')), {
+            method: 'POST', body: data, headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
         });
-    });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || 'Please check your details and try again.');
+        await Swal.fire({icon: 'success', title: 'Message sent!', text: 'Thank you for getting in touch.', background: '#1b1b25', color: '#fff9cb', confirmButtonColor: '#f976b0'});
+        this.reset();
+    } catch (error) {
+        Swal.fire({icon: 'error', title: 'Unable to send', text: error.message, background: '#1b1b25', color: '#fff9cb', confirmButtonColor: '#f976b0'});
+    } finally {
+        button.disabled = false;
+        button.textContent = label;
+    }
 });
 </script>
 @endsection

@@ -7,6 +7,12 @@ use App\Http\Controllers\PageController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\TagController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+
+// Allow first-install Artisan commands to run before database-backed routes exist.
+if (app()->runningInConsole() && ! Schema::hasTable('redirects')) {
+    return;
+}
 
 /*
  *

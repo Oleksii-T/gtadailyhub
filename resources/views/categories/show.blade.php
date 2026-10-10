@@ -18,14 +18,22 @@
             </h1>
         </div>
 
+        <form class="archive-search" action="{{ $tagSlug ? route('categories.show.tag', ['category' => $category->slug, 'tagSlug' => $tagSlug]) : route('categories.show', $category) }}" method="get" role="search">
+            <label class="sr-only" for="archive-search">Search articles</label>
+            <input id="archive-search" type="search" name="search" value="{{ request('search') }}" placeholder="Search the dispatches…" maxlength="150">
+            @if(request('game'))<input type="hidden" name="game" value="{{ request('game') }}">@endif
+            <button type="submit">Search ↗</button>
+        </form>
+        @if(request('search'))<p class="search-results-label">{{ $posts->total() }} {{ Str::plural('result', $posts->total()) }} for “{{ request('search') }}”</p>@endif
+
         {{-- Tag filters --}}
         @if ($topTags->isNotEmpty())
             <nav class="tag-filter-row" aria-label="Filter by topic">
                 <a class="tag-filter{{ !$tagSlug ? ' active' : '' }}"
-                   href="{{ route('categories.show', $category) }}">All</a>
+                   href="{{ route('categories.show', $category) . (request()->only('search', 'game') ? '?' . http_build_query(request()->only('search', 'game')) : '') }}">All</a>
                 @foreach ($topTags->take(15) as $tag)
                     <a class="tag-filter{{ $tagSlug == $tag->slug ? ' active' : '' }}"
-                       href="{{ route('categories.show.tag', ['category' => $category->slug, 'tagSlug' => $tag->slug]) }}">
+                       href="{{ route('categories.show.tag', ['category' => $category->slug, 'tagSlug' => $tag->slug]) . (request()->only('search', 'game') ? '?' . http_build_query(request()->only('search', 'game')) : '') }}">
                         {{ $tag->name }}
                     </a>
                 @endforeach
@@ -34,6 +42,7 @@
 
         {{-- Posts grid --}}
         <div class="posts-grid pagination-content" id="posts-container">
+            @if($posts->isEmpty())<div class="empty-state"><span class="eyebrow">The news desk</span><h3>No dispatches found.</h3><p>Try another search or explore all the latest stories.</p><a class="text-link" href="{{ route('categories.show', $category) }}">Browse all news ↗</a></div>@endif
             @include('components.post-cards-with-pages', [
                 'posts' => $posts,
                 'model' => $category,
