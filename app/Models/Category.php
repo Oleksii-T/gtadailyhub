@@ -79,7 +79,7 @@ class Category extends Model
 
     public static function forHeader()
     {
-        return self::where('in_menu', true)->orderBy('order')->get();
+        return self::where('in_menu', true)->whereNull('parent_id')->orderBy('order')->get();
     }
 
     public static function dataTable($query)

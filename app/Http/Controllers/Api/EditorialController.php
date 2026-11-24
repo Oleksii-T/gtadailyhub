@@ -21,6 +21,7 @@ use App\Services\EditorialHtmlSanitizer;
 use App\Services\PostService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
 class EditorialController extends Controller
@@ -188,6 +189,7 @@ class EditorialController extends Controller
         });
         if (! ($result['replayed'] ?? false)) {
             Category::getAllSlugs(true);
+            Cache::forget('headerCategories');
             GenerateSitemap::run();
         }
 

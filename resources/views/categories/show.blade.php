@@ -18,6 +18,21 @@
             </h1>
         </div>
 
+        @if ($category->parent || $category->children->isNotEmpty())
+            <nav class="tag-filter-row" aria-label="Category navigation">
+                @if ($category->parent)
+                    <a class="tag-filter" href="{{ route('categories.show', $category->parent) }}">← {{ $category->parent->name }}</a>
+                    <span class="tag-filter active" aria-current="page">{{ $category->name }}</span>
+                @endif
+                @foreach ($category->children as $child)
+                    <a class="tag-filter" href="{{ route('categories.show', $child) }}">{{ $child->name }} ↗</a>
+                @endforeach
+            </nav>
+        @endif
+        @if (trim(strip_tags($category->description)))
+            <p class="cat-description">{{ strip_tags($category->description) }}</p>
+        @endif
+
         <form class="archive-search" action="{{ $tagSlug ? route('categories.show.tag', ['category' => $category->slug, 'tagSlug' => $tagSlug]) : route('categories.show', $category) }}" method="get" role="search">
             <label class="sr-only" for="archive-search">Search articles</label>
             <input id="archive-search" type="search" name="search" value="{{ request('search') }}" placeholder="Search the dispatches…" maxlength="150">

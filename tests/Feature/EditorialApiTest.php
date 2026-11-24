@@ -20,6 +20,10 @@ class EditorialApiTest extends TestCase
         \Illuminate\Support\Facades\Route::get('/{post:slug}', fn () => '')->name('posts.show');
         \Illuminate\Support\Facades\Route::get('/author/{author}', fn () => '')->name('authors.show');
         \Illuminate\Support\Facades\Route::get('/game/{game}', fn () => '')->name('games.show');
+        foreach (['index', 'about-us', 'contact-us', 'privacy', 'terms', 'cookiePolicy', 'reviewPolicy'] as $name) {
+            \Illuminate\Support\Facades\Route::get('/test-'.$name, fn () => '')->name($name);
+        }
+        \Illuminate\Support\Facades\Route::get('/test-news/{tagSlug}', fn () => '')->name('categories.show.tag');
         \Illuminate\Support\Facades\Route::getRoutes()->refreshNameLookups();
     }
 
@@ -62,18 +66,37 @@ class EditorialApiTest extends TestCase
             'content' => '<h2>Topic</h2><p><a href="javascript:alert(1)">bad</a><a href="https://example.com">good</a></p><img src="x" onerror="alert(1)">',
             'meta_title' => 'GTA Topic Hub', 'meta_description' => 'Topic links', 'status' => 'published',
         ];
-        $this->putJson('/api/editorial/pages/by-key/topic-hub', $page, $headers)->assertOk()->assertJsonPath('action', 'created');
-        $this->putJson('/api/editorial/pages/by-key/topic-hub', $page, $headers)->assertOk()->assertJsonPath('replayed', true);
+        $firstPage = $this->putJson('/api/editorial/pages/by-key/topic-hub', $page, $headers)->assertOk()->assertJsonPath('action', 'created')->assertJsonPath('revision', 1);
+        $this->assertNotNull($firstPage->json('event_id'));
+        $this->putJson('/api/editorial/pages/by-key/topic-hub', $page, $headers)->assertOk()->assertJsonPath('replayed', true)->assertJsonPath('revision', 1)->assertJsonPath('event_id', $firstPage->json('event_id'));
         $saved = Page::query()->where('editorial_key', 'topic-hub')->firstOrFail();
         $this->assertStringNotContainsString('javascript:', $saved->content);
         $this->assertStringNotContainsString('onerror', $saved->content);
         $this->assertStringContainsString('https://example.com', $saved->content);
         $this->getJson('/api/editorial/pages', $headers)->assertOk()->assertJsonFragment(['editorial_key' => 'topic-hub']);
-        $this->putJson('/api/editorial/pages/by-key/topic-hub', [...$page, 'request_id' => 'page-2', 'title' => 'Updated GTA Topic Hub'], $headers)->assertOk()->assertJsonPath('action', 'updated');
+        $this->putJson('/api/editorial/pages/by-key/topic-hub', [...$page, 'request_id' => 'page-2', 'title' => 'Updated GTA Topic Hub'], $headers)->assertOk()->assertJsonPath('action', 'updated')->assertJsonPath('revision', 2);
         $this->assertEquals(5, EditorialApiEvent::query()->count());
         $this->assertNull(EditorialApiEvent::query()->where('entity_type', 'page')->firstOrFail()->before_summary);
         $this->assertStringNotContainsString('Topic</h2>', json_encode(EditorialApiEvent::query()->where('entity_type', 'page')->firstOrFail()->after_summary));
         $this->assertNotEmpty($response->json('url'));
+    }
+
+    public function test_category_page_links_to_parent_and_children(): void
+    {
+        $parent = Category::query()->create(['name' => 'GTA Guides', 'description' => 'Guide collection', 'slug' => 'gta-guides', 'meta_title' => 'GTA Guides', 'meta_description' => 'Guides', 'order' => 1, 'in_menu' => true]);
+        $child = Category::query()->create(['name' => 'Vehicles', 'description' => 'Vehicle guides', 'slug' => 'vehicles', 'meta_title' => 'Vehicles', 'meta_description' => 'Vehicles', 'parent_id' => $parent->id, 'order' => 2]);
+        \Illuminate\Support\Facades\Route::get('/preview-category/{category}', fn (string $slug) => app(\App\Http\Controllers\CategoryController::class)->show(request(), Category::query()->where('slug', $slug)->firstOrFail()));
+        $startingBufferLevel = ob_get_level();
+
+        try {
+            $this->get('/preview-category/gta-guides')->assertOk()->assertSee('Category navigation')->assertSee('Vehicles');
+            $this->get('/preview-category/vehicles')->assertOk()->assertSee('Category navigation')->assertSee('GTA Guides');
+            $this->assertEquals(['gta-guides'], Category::forHeader()->pluck('slug')->all());
+        } finally {
+            while (ob_get_level() > $startingBufferLevel) {
+                ob_end_clean();
+            }
+        }
     }
 
     public function test_existing_post_can_be_claimed_once_for_revision(): void
@@ -104,7 +127,7 @@ class EditorialApiTest extends TestCase
         $this->putJson('/api/editorial/posts/by-key/update-explained', $payload, $headers)->assertOk()->assertJsonPath('replayed', true);
         $this->assertEquals(1, Post::query()->count());
         $revision = [...$payload, 'request_id' => 'post-2', 'body' => '<p>Updated facts.</p>', 'category_slug' => 'guides', 'status' => 'published', 'related_ids' => [$id]];
-        $this->putJson('/api/editorial/posts/by-key/update-explained', $revision, $headers)->assertOk()->assertJsonPath('action', 'updated');
+        $this->putJson('/api/editorial/posts/by-key/update-explained', $revision, $headers)->assertOk()->assertJsonPath('action', 'updated')->assertJsonPath('revision', 2);
         $post = Post::query()->findOrFail($id);
         $this->assertEquals('guides', $post->category->slug);
         $this->assertEquals([$id], $post->related);

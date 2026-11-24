@@ -27,7 +27,8 @@ class EditorialApiService
                 }
 
                 [$entityId, $action, $before, $after, $response] = $operation();
-                EditorialApiEvent::query()->create([
+                $response['revision'] = EditorialApiEvent::query()->where('entity_type', $entityType)->where('entity_id', $entityId)->count() + 1;
+                $event = EditorialApiEvent::query()->create([
                     'request_id' => $requestId,
                     'editorial_key' => $editorialKey,
                     'entity_type' => $entityType,
@@ -38,6 +39,9 @@ class EditorialApiService
                     'after_summary' => $after,
                     'result' => $response,
                 ]);
+
+                $response['event_id'] = $event->id;
+                $event->update(['result' => $response]);
 
                 return $response;
             }, 3);
@@ -56,6 +60,8 @@ class EditorialApiService
             'editorial_key' => $editorialKey,
             'entity_id' => $result['id'],
             'action' => $result['action'],
+            'revision' => $result['revision'],
+            'event_id' => $result['event_id'],
             'replayed' => $result['replayed'] ?? false,
             'url' => $result['url'],
             'before' => $event->before_summary,

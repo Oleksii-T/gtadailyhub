@@ -12,6 +12,7 @@ class CategoryController extends Controller
 {
     public function show(Request $request, Category $category)
     {
+        $category->load(['parent', 'children' => fn ($query) => $query->orderBy('order')->orderBy('name')]);
         $tagSlug = $request->route('tagSlug');
         $tag = $tagSlug ? Tag::where('slug', $tagSlug)->first() : null;
         $page = $request->route('page') ?? 1;

@@ -43,7 +43,7 @@ class AppServiceProvider extends ServiceProvider
             $view->with(
                 'headerCategories',
                 Cache::remember('headerCategories', $cashTime, function () {
-                    return Category::where('in_menu', true)->orderBy('order')->get();
+                    return Category::forHeader();
                 })
             );
 
@@ -90,7 +90,7 @@ class AppServiceProvider extends ServiceProvider
             $class = trim($class, "' ");
 
             // Create the dom document as per the other answers
-            $svg = new \DOMDocument();
+            $svg = new \DOMDocument;
             $svg->load(public_path($path));
             $svg->documentElement->setAttribute('class', $class);
             $output = $svg->saveXML($svg->documentElement);
