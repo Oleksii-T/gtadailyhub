@@ -17,6 +17,8 @@ class Category extends Model
     ];
 
     protected $fillable = [
+        'parent_id',
+        'editorial_key',
         'in_menu',
         'name',
         'description',
@@ -35,6 +37,16 @@ class Category extends Model
     public function posts()
     {
         return $this->hasMany(Post::class);
+    }
+
+    public function parent()
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(self::class, 'parent_id');
     }
 
     public function meta_thumbnail()

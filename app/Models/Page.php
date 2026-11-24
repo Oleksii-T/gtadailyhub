@@ -9,6 +9,7 @@ use Yajra\DataTables\DataTables;
 class Page extends Model
 {
     protected $fillable = [
+        'editorial_key',
         'user_id',
         'status',
         'title',

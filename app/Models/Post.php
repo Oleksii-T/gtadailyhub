@@ -27,6 +27,7 @@ class Post extends Model
     private $thumbnail = null;
 
     protected $fillable = [
+        'editorial_key',
         'parent_id',
         'game_id',
         'user_id',

@@ -17,7 +17,8 @@ class ApiBearerAuth
     {
         $bearerToken = $request->bearerToken();
 
-        if ($bearerToken !== config('auth.api_bearer')) {
+        $configuredToken = config('auth.api_bearer');
+        if (! is_string($configuredToken) || $configuredToken === '' || ! is_string($bearerToken) || ! hash_equals($configuredToken, $bearerToken)) {
             abort(403, 'Unauthorized');
         }
 

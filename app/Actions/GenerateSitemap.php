@@ -31,7 +31,7 @@ class GenerateSitemap
         $sm = Sitemap::create();
 
         foreach ($pages as $page) {
-            $sm->add(Url::create(url($page->link))->setLastModificationDate($page->created_at));
+            $sm->add(Url::create(url($page->link))->setLastModificationDate($page->updated_at));
         }
 
         foreach (Post::publised()->get() as $post) {

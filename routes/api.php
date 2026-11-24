@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\EditorialController;
 use App\Http\Controllers\Api\PostController;
 use Illuminate\Support\Facades\Route;
 
@@ -15,6 +16,15 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::middleware('api-bearer')->group(function () {
+    Route::get('editorial/posts', [EditorialController::class, 'posts']);
+    Route::get('editorial/posts/{id}', [EditorialController::class, 'post'])->whereNumber('id');
+    Route::get('editorial/categories', [EditorialController::class, 'categories']);
+    Route::get('editorial/pages', [EditorialController::class, 'pages']);
+    Route::get('editorial/events', [EditorialController::class, 'events']);
+    Route::put('editorial/posts/by-key/{editorialKey}', [EditorialController::class, 'upsertPost'])->where('editorialKey', '[A-Za-z0-9._:-]{1,120}');
+    Route::put('editorial/categories/by-key/{editorialKey}', [EditorialController::class, 'upsertCategory'])->where('editorialKey', '[A-Za-z0-9._:-]{1,120}');
+    Route::put('editorial/pages/by-key/{editorialKey}', [EditorialController::class, 'upsertPage'])->where('editorialKey', '[A-Za-z0-9._:-]{1,120}');
+
     Route::post('posts', [PostController::class, 'store']);
     Route::put('posts/{id}', [PostController::class, 'update']);
 });
