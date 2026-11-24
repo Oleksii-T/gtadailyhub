@@ -28,6 +28,10 @@ return [
         'measurement_id' => env('GA_MEASUREMENT_ID'),
     ],
 
+    'google_tag_manager' => [
+        'container_id' => env('GTM_CONTAINER_ID'),
+    ],
+
     'recaptcha' => [
         'public_key' => env('RECAPTCHA_PUBLIC_KEY'),
         'private_key' => env('RECAPTCHA_PRIVATE_KEY'),

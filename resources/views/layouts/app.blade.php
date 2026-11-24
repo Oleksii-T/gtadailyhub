@@ -2,6 +2,14 @@
 <html lang="en" dir="ltr">
 
 <head>
+    @if (config('services.google_tag_manager.container_id'))
+        <script async src="https://www.googletagmanager.com/gtm.js?id={{ config('services.google_tag_manager.container_id') }}"></script>
+        <script>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+        </script>
+    @endif
     <title>@yield('title', (isset($page) ? $page->meta_title : null) ?: config('app.name'))</title>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -77,7 +85,7 @@
     window.Laravel = {!!$LaravelDataForJS!!};
 </script>
 
-@if (config('services.google_analytics.measurement_id') && !app()->environment('local'))
+@if (config('services.google_analytics.measurement_id') && !config('services.google_tag_manager.container_id') && !app()->environment('local'))
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ config('services.google_analytics.measurement_id') }}"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
