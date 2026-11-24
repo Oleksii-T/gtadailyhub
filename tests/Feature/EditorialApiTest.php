@@ -85,11 +85,12 @@ class EditorialApiTest extends TestCase
     {
         $parent = Category::query()->create(['name' => 'GTA Guides', 'description' => 'Guide collection', 'slug' => 'gta-guides', 'meta_title' => 'GTA Guides', 'meta_description' => 'Guides', 'order' => 1, 'in_menu' => true]);
         $child = Category::query()->create(['name' => 'Vehicles', 'description' => 'Vehicle guides', 'slug' => 'vehicles', 'meta_title' => 'Vehicles', 'meta_description' => 'Vehicles', 'parent_id' => $parent->id, 'order' => 2]);
+        Post::query()->create(['title' => 'Child GTA story', 'slug' => 'child-gta-story', 'meta_title' => 'Child GTA story', 'meta_description' => 'Story', 'category_id' => $child->id, 'status' => \App\Enums\PostStatus::PUBLISHED, 'tc_style' => \App\Enums\PostTCStyle::R_SIDEBAR, 'published_at' => now()]);
         \Illuminate\Support\Facades\Route::get('/preview-category/{category}', fn (string $slug) => app(\App\Http\Controllers\CategoryController::class)->show(request(), Category::query()->where('slug', $slug)->firstOrFail()));
         $startingBufferLevel = ob_get_level();
 
         try {
-            $this->get('/preview-category/gta-guides')->assertOk()->assertSee('Category navigation')->assertSee('Vehicles');
+            $this->get('/preview-category/gta-guides')->assertOk()->assertSee('Category navigation')->assertSee('Vehicles')->assertSee('Child GTA story');
             $this->get('/preview-category/vehicles')->assertOk()->assertSee('Category navigation')->assertSee('GTA Guides');
             $this->assertEquals(['gta-guides'], Category::forHeader()->pluck('slug')->all());
         } finally {

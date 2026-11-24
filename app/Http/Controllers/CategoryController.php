@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Game;
 use App\Models\Page;
+use App\Models\Post;
 use App\Models\Tag;
 use Illuminate\Http\Request;
 
@@ -18,7 +19,8 @@ class CategoryController extends Controller
         $page = $request->route('page') ?? 1;
         $perPage = 10;
         $page = abs((int) filter_var($page, FILTER_SANITIZE_NUMBER_INT));
-        $posts = $category->posts()
+        $posts = Post::query()
+            ->whereIn('category_id', $this->categoryAndDescendantIds($category))
             ->with(['category', 'tags'])
             ->publised()
             ->latest('published_at')
@@ -47,5 +49,25 @@ class CategoryController extends Controller
                 'includeQueryParams' => ['game', 'search'],
             ])->render(),
         ]);
+    }
+
+    /** @return array<int, int> */
+    private function categoryAndDescendantIds(Category $category): array
+    {
+        $childrenByParent = Category::query()->select(['id', 'parent_id'])->get()->groupBy('parent_id');
+        $pending = [$category->id];
+        $ids = [];
+        while ($pending !== []) {
+            $id = array_pop($pending);
+            if (in_array($id, $ids, true)) {
+                continue;
+            }
+            $ids[] = $id;
+            foreach ($childrenByParent->get($id, collect()) as $child) {
+                $pending[] = $child->id;
+            }
+        }
+
+        return $ids;
     }
 }
