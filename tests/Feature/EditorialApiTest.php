@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\EditorialApiEvent;
 use App\Models\Page;
 use App\Models\Post;
+use App\Models\Redirect;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -136,5 +137,62 @@ class EditorialApiTest extends TestCase
         $this->getJson('/api/editorial/posts', $headers)->assertOk()->assertJsonFragment(['editorial_key' => 'update-explained']);
         $this->getJson('/api/editorial/posts/'.$id, $headers)->assertOk()->assertSee('Updated facts.');
         $this->getJson('/api/editorial/events', $headers)->assertOk()->assertJsonFragment(['request_id' => 'post-2']);
+        $canonicalRevision = $revision;
+        ksort($canonicalRevision);
+        $this->getJson('/api/editorial/events/by-request/post-2', $headers)
+            ->assertOk()->assertJsonPath('entity_type', 'post')->assertJsonPath('editorial_key', 'update-explained')
+            ->assertJsonPath('receipt.revision', 2)
+            ->assertJsonPath('receipt.payload_fingerprint', hash('sha256', json_encode($canonicalRevision, JSON_THROW_ON_ERROR)));
+        $this->getJson('/api/editorial/events/by-request/unknown', $headers)->assertOk()->assertJsonPath('found', false);
+        $this->getJson('/api/editorial/events/by-request/post-2')->assertForbidden();
+    }
+
+    public function test_editorial_redirect_consolidates_published_posts_and_replays_safely(): void
+    {
+        $headers = $this->headers();
+        $category = Category::query()->create([
+            'name' => 'News', 'description' => 'News', 'slug' => 'news',
+            'meta_title' => 'News', 'meta_description' => 'News', 'order' => 1,
+        ]);
+        $makePost = fn (string $slug): Post => Post::query()->create([
+            'title' => $slug, 'slug' => $slug, 'meta_title' => $slug,
+            'meta_description' => $slug, 'category_id' => $category->id,
+            'status' => \App\Enums\PostStatus::PUBLISHED,
+            'tc_style' => \App\Enums\PostTCStyle::R_SIDEBAR, 'published_at' => now(),
+        ]);
+        $source = $makePost('duplicate-gta-story');
+        $target = $makePost('canonical-gta-story');
+        $otherTarget = $makePost('other-gta-story');
+        $payload = ['request_id' => 'redirect-1', 'source_post_id' => $source->id, 'target_post_id' => $target->id];
+
+        $first = $this->putJson('/api/editorial/redirects/by-key/story-consolidation', $payload, $headers)
+            ->assertOk()->assertJsonPath('action', 'created')->assertJsonPath('revision', 1);
+        $this->assertSame(1, Redirect::query()->count());
+        $this->assertSame('duplicate-gta-story', Redirect::query()->firstOrFail()->from);
+        $this->assertSame('/canonical-gta-story/', Redirect::query()->firstOrFail()->to);
+        $this->assertSame(\App\Enums\PostStatus::HIDDEN, $source->fresh()->status);
+        $this->getJson('/api/editorial/redirects', $headers)->assertOk()->assertJsonFragment(['editorial_key' => 'story-consolidation']);
+        file_put_contents(public_path('sitemap.xml'), '<urlset><loc>stale-duplicate-gta-story</loc></urlset>');
+        $this->putJson('/api/editorial/redirects/by-key/story-consolidation', $payload, $headers)
+            ->assertOk()->assertJsonPath('replayed', true)->assertJsonPath('event_id', $first->json('event_id'));
+        $this->assertStringNotContainsString('stale-duplicate-gta-story', file_get_contents(public_path('sitemap.xml')));
+        $this->putJson('/api/editorial/redirects/by-key/story-consolidation', [
+            ...$payload, 'target_post_id' => $otherTarget->id,
+        ], $headers)->assertStatus(409);
+        $this->putJson('/api/editorial/redirects/by-key/another-key', [
+            ...$payload, 'request_id' => 'redirect-2', 'target_post_id' => $otherTarget->id,
+        ], $headers)->assertUnprocessable();
+        $this->putJson('/api/editorial/redirects/by-key/redirect-chain', [
+            'request_id' => 'redirect-3', 'source_post_id' => $otherTarget->id,
+            'target_post_id' => $source->id,
+        ], $headers)->assertUnprocessable();
+        $this->getJson('/api/editorial/redirects')->assertForbidden();
+
+        \Illuminate\Support\Facades\Route::setRoutes(new \Illuminate\Routing\RouteCollection);
+        require base_path('routes/web.php');
+        $this->get('/duplicate-gta-story/')->assertStatus(301)->assertRedirect('/canonical-gta-story/');
+        $this->get('/duplicate-gta-story/?ref=old')->assertStatus(301)->assertRedirect('/canonical-gta-story/?ref=old');
+        $this->get('/duplicate-gta-story/')->assertStatus(301)->assertRedirect('/canonical-gta-story/');
+        $this->assertStringNotContainsString('duplicate-gta-story', file_get_contents(public_path('sitemap.xml')));
     }
 }

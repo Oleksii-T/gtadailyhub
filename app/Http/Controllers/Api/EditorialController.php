@@ -11,11 +11,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\EditorialCategoryRequest;
 use App\Http\Requests\Api\EditorialPageRequest;
 use App\Http\Requests\Api\EditorialPostRequest;
+use App\Http\Requests\Api\EditorialRedirectRequest;
 use App\Models\Author;
 use App\Models\Category;
 use App\Models\EditorialApiEvent;
 use App\Models\Page;
 use App\Models\Post;
+use App\Models\Redirect;
 use App\Services\EditorialApiService;
 use App\Services\EditorialHtmlSanitizer;
 use App\Services\PostService;
@@ -87,6 +89,70 @@ class EditorialController extends Controller
         return response()->json(EditorialApiEvent::query()->orderByDesc('id')->paginate($filters['per_page'] ?? 50));
     }
 
+    public function eventByRequest(string $requestId): JsonResponse
+    {
+        $event = EditorialApiEvent::query()->where('request_id', $requestId)->first();
+        if ($event === null) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json([
+            'request_id' => $event->request_id, 'editorial_key' => $event->editorial_key,
+            'entity_type' => $event->entity_type, 'receipt' => $event->result,
+        ]);
+    }
+
+    public function redirects(): JsonResponse
+    {
+        return response()->json(Redirect::query()->whereNotNull('editorial_key')->orderByDesc('id')->get()
+            ->map(fn (Redirect $redirect): array => [
+                'id' => $redirect->id, 'editorial_key' => $redirect->editorial_key,
+                'from' => $redirect->from, 'to' => $redirect->to, 'code' => (int) $redirect->code,
+                'is_active' => (bool) $redirect->is_active, 'url' => url($redirect->from),
+                'updated_at' => $redirect->updated_at?->toIso8601String(),
+            ]));
+    }
+
+    public function upsertRedirect(EditorialRedirectRequest $request, string $editorialKey): JsonResponse
+    {
+        $data = $request->validated();
+        $result = $this->events->mutate('redirect', $editorialKey, $data['request_id'], $data, function () use ($data, $editorialKey): array {
+            $source = Post::query()->lockForUpdate()->findOrFail($data['source_post_id']);
+            $target = Post::query()->findOrFail($data['target_post_id']);
+            $redirect = Redirect::query()->where('editorial_key', $editorialKey)->lockForUpdate()->first();
+
+            if ($target->status !== PostStatus::PUBLISHED || Redirect::query()->where('from', $target->slug)->where('is_active', true)->exists()) {
+                throw ValidationException::withMessages(['target_post_id' => 'The canonical target must be a published post without an active redirect.']);
+            }
+            if ($source->status !== PostStatus::PUBLISHED && ! ($source->status === PostStatus::HIDDEN && $redirect !== null)) {
+                throw ValidationException::withMessages(['source_post_id' => 'The source must be a published post or the already consolidated post.']);
+            }
+            if (Redirect::query()->where('from', $source->slug)->when($redirect, fn ($query) => $query->whereKeyNot($redirect->id))->exists()) {
+                throw ValidationException::withMessages(['source_post_id' => 'The source URL already has a redirect.']);
+            }
+            if ($redirect !== null && $redirect->from !== $source->slug) {
+                throw ValidationException::withMessages(['source_post_id' => 'This editorial key belongs to another source URL.']);
+            }
+
+            $before = $redirect === null ? null : ['from' => $redirect->from, 'to' => $redirect->to, 'code' => (int) $redirect->code];
+            $values = ['editorial_key' => $editorialKey, 'from' => $source->slug,
+                'to' => '/'.$target->slug.'/', 'code' => '301', 'is_active' => true];
+            $action = $redirect === null ? 'created' : 'updated';
+            $redirect = $redirect === null ? Redirect::query()->create($values) : tap($redirect)->update($values);
+            $source->update(['status' => PostStatus::HIDDEN]);
+            $response = ['id' => $redirect->id, 'editorial_key' => $editorialKey, 'action' => $action,
+                'url' => url($redirect->from), 'target_url' => route('posts.show', $target),
+                'updated_at' => $redirect->updated_at?->toIso8601String()];
+
+            return [$redirect->id, $action, $before, ['from' => $redirect->from, 'to' => $redirect->to, 'code' => 301], $response];
+        });
+        Redirect::getAll(true);
+        Post::getAllSlugs(true);
+        GenerateSitemap::run();
+
+        return response()->json($result);
+    }
+
     public function upsertPost(EditorialPostRequest $request, string $editorialKey): JsonResponse
     {
         $data = $request->validated();
@@ -148,10 +214,8 @@ class EditorialController extends Controller
 
             return [$post->id, $action, $before, $this->postSummary($post, $body), $response];
         });
-        if (! ($result['replayed'] ?? false)) {
-            Post::getAllSlugs(true);
-            GenerateSitemap::run();
-        }
+        Post::getAllSlugs(true);
+        GenerateSitemap::run();
 
         return response()->json($result);
     }
@@ -187,11 +251,9 @@ class EditorialController extends Controller
 
             return [$category->id, $action, $before, $this->categorySummary($category), $response];
         });
-        if (! ($result['replayed'] ?? false)) {
-            Category::getAllSlugs(true);
-            Cache::forget('headerCategories');
-            GenerateSitemap::run();
-        }
+        Category::getAllSlugs(true);
+        Cache::forget('headerCategories');
+        GenerateSitemap::run();
 
         return response()->json($result);
     }
@@ -223,10 +285,8 @@ class EditorialController extends Controller
 
             return [$page->id, $action, $before, $this->pageSummary($page), $response];
         });
-        if (! ($result['replayed'] ?? false)) {
-            Page::getAllSlugs(true);
-            GenerateSitemap::run();
-        }
+        Page::getAllSlugs(true);
+        GenerateSitemap::run();
 
         return response()->json($result);
     }

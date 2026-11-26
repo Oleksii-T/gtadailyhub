@@ -24,8 +24,9 @@ Route::any('dev/{action}', [\App\Http\Controllers\DevController::class, 'action'
 
 foreach (\App\Models\Redirect::getAll() as $r) {
     Route::get("{$r->from}", function () use ($r) {
+        $to = $r->to;
         if (request()->getQueryString()) {
-            $r->to .= '?'.request()->getQueryString();
+            $to .= '?'.request()->getQueryString();
         }
 
         $r->update([
@@ -36,9 +37,7 @@ foreach (\App\Models\Redirect::getAll() as $r) {
         $extensions = ['webp', 'png', 'jpeg', 'jpg', 'svg'];
         $extensions = array_map('preg_quote', $extensions);
         $pattern = '/'.implode('|', $extensions).'/';
-        $to = $r->to;
-
-        if (preg_match($pattern, $r->to) === 1) {
+        if (preg_match($pattern, $to) === 1) {
             $to = rtrim(url(''), '/').$to;
         }
 

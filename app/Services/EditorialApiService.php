@@ -18,9 +18,10 @@ class EditorialApiService
     public function mutate(string $entityType, string $editorialKey, string $requestId, array $payload, Closure $operation): array
     {
         $payloadHash = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR));
+        $payloadFingerprint = $this->payloadFingerprint($payload);
 
         try {
-            $result = DB::transaction(function () use ($entityType, $editorialKey, $requestId, $payloadHash, $operation): array {
+            $result = DB::transaction(function () use ($entityType, $editorialKey, $requestId, $payloadHash, $payloadFingerprint, $operation): array {
                 $previous = EditorialApiEvent::query()->where('request_id', $requestId)->first();
                 if ($previous !== null) {
                     return $this->replay($previous, $entityType, $editorialKey, $payloadHash);
@@ -28,6 +29,7 @@ class EditorialApiService
 
                 [$entityId, $action, $before, $after, $response] = $operation();
                 $response['revision'] = EditorialApiEvent::query()->where('entity_type', $entityType)->where('entity_id', $entityId)->count() + 1;
+                $response['payload_fingerprint'] = $payloadFingerprint;
                 $event = EditorialApiEvent::query()->create([
                     'request_id' => $requestId,
                     'editorial_key' => $editorialKey,
@@ -80,5 +82,24 @@ class EditorialApiService
         }
 
         return [...$event->result, 'replayed' => true];
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function payloadFingerprint(array $payload): string
+    {
+        $canonicalize = static function (array $values) use (&$canonicalize): array {
+            if (! array_is_list($values)) {
+                ksort($values);
+            }
+            foreach ($values as &$value) {
+                if (is_array($value)) {
+                    $value = $canonicalize($value);
+                }
+            }
+
+            return $values;
+        };
+
+        return hash('sha256', json_encode($canonicalize($payload), JSON_THROW_ON_ERROR));
     }
 }
